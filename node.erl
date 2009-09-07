@@ -1,5 +1,5 @@
 -module(node).
--export([start/0, send/1, stop/0, restart/0, connect/1]).
+-export([start/0, send/1, stop/0, reload/0, connect/1]).
 
 send(Message) ->
   {server, node()} ! {chat, Message},
@@ -19,13 +19,23 @@ start() ->
   register(server, Server),
   io:format("Started~n").
 
-restart() ->
-  stop(),
-  start().
+reload() ->
+  io:format("Swapping code~n"),
+  % TODO: Fix this, it's not exiting the old 'loop()' (stack overflow?)
+  {server, node()} ! {swap_code, fun() -> loop() end},
+  ok.
 
 loop() ->
-  io:format("Waiting...~n"),
+  io:format("Waiting~n"),
   receive
+    {swap_code, LoopFunc, Host} ->
+      io:format("Loading new code (requested by ~p)~n", [Host]),
+      LoopFunc();
+    {swap_code, LoopFunc} ->
+      io:format("Reloading other nodes~n"),
+      [{server, N} ! {swap_code, LoopFunc, node()} || N <- nodes()],
+      io:format("Loading new code~n"),
+      LoopFunc();
     {add_host, Host} ->
       io:format("Connecting to: ~p~n", [Host]),
       Status = net_kernel:connect_node(Host),
