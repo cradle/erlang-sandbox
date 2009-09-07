@@ -14,32 +14,36 @@ connect(Host) ->
   ok.
 
 start() ->
+  io:format("Starting~n"),
   Server = spawn(fun() -> loop() end),
-  register(server, Server).
+  register(server, Server),
+  io:format("Started~n").
 
 restart() ->
   stop(),
   start().
 
 loop() ->
+  io:format("Waiting...~n"),
   receive
     {add_host, Host} ->
+      io:format("Connecting to: ~p~n", [Host]),
       Status = net_kernel:connect_node(Host),
       case Status of
-        true -> io:format("Connected to ~p~n", Host);
-        false -> io:format("Unable to connect to ~p~n", Host);
+        true -> io:format("Connected to ~p~n", [Host]);
+        false -> io:format("Unable to connect to ~p~n", [Host]);
         ignored -> io:format("Not started with name (ie. erl -sname 'foo')")
-      end;
+      end,
+      loop();
     {chat, Message} ->
-      % io:format("You: ~p~n", [Message]),
+      io:format("You: ~p~n", [Message]),
       [{server, N} ! {print, Message, node()} || N <- nodes()],
       loop();
     {print, Message, Node} ->
       io:format("~p: ~p~n", [Node, Message]),
       loop();
-    reload ->
-      loop();
     shutdown ->
+      io:format("Stopping~n"),
       ok;
     Message ->
       io:format("Unknown message: ~p~n", Message),
