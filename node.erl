@@ -28,16 +28,6 @@ reload(Server) ->
   Server ! {swap_code, fun() -> loop() end},
   ok.
 
-sleep(ActiveFun) ->
-  receive
-    wake_up ->
-      io:format("Resuming operations~n"),
-      ActiveFun();
-    Msg ->
-      io:format("Sleeping: ~p ignored.~n", [Msg]),
-      sleep(ActiveFun)
-  end.
-
 loop() ->
   receive
     {swap_code, LoopFunc, Host} ->
@@ -61,9 +51,6 @@ loop() ->
     {print, Message, Node} ->
       io:format("~p: ~p~n", [Node, Message]),
       loop();
-    sleep ->
-      io:format("Going to sleep~n"),
-      sleep(fun() -> loop() end);
     shutdown ->
       ok;
     Message ->
