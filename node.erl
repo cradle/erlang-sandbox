@@ -1,44 +1,41 @@
 -module(node).
--export([start/0, send/1, stop/0, reload/0, connect/1]).
+-export([start/0, send/2, stop/1, reload/1, connect/2, status/1]).
 
-send(Message) ->
-  {server, node()} ! {chat, Message},
+send(Message, Server) ->
+  Server ! {chat, Message},
   ok.
 
-stop() ->
-  case whereis(server) of
-    undefined -> 
-      not_running;
-    Pid -> 
-      Pid ! shutdown,
-      ok
-  end.
+stop(Server) ->
+  Server ! shutdown,
+  ok.
 
-connect(Host) ->
-  case whereis(server) of
-    undefined -> 
-      not_running;
-    Pid -> 
-      Pid ! {add_host, Host},
-      ok
+connect(Host, Server) ->
+  Server ! {add_host, Host},
+  ok.
+
+status(Server) ->
+  case process_info(Server) of
+    undefined ->
+      stopped;
+    _ ->
+      running
   end.
 
 start() ->
-  case whereis(server) of
-    undefined ->
-      Server = spawn(fun() -> loop() end),
-      register(server, Server);
-    Pid ->
-      {already_running, Pid}
-  end.
+  spawn(fun() -> loop() end).
 
-reload() ->
-  case whereis(server) of
-    undefined -> 
-      not_running;
-    Pid -> 
-      Pid ! {swap_code, fun() -> loop() end},
-      ok
+reload(Server) ->
+  Server ! {swap_code, fun() -> loop() end},
+  ok.
+
+sleep(ActiveFun) ->
+  receive
+    wake_up ->
+      io:format("Resuming operations~n"),
+      ActiveFun();
+    Msg ->
+      io:format("Sleeping: ~p ignored.~n", [Msg]),
+      sleep(ActiveFun)
   end.
 
 loop() ->
@@ -64,6 +61,9 @@ loop() ->
     {print, Message, Node} ->
       io:format("~p: ~p~n", [Node, Message]),
       loop();
+    sleep ->
+      io:format("Going to sleep~n"),
+      sleep(fun() -> loop() end);
     shutdown ->
       ok;
     Message ->
