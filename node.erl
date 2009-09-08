@@ -6,43 +6,55 @@ send(Message) ->
   ok.
 
 stop() ->
-  {server, node()} ! shutdown,
-  ok.
+  case whereis(server) of
+    undefined -> 
+      not_running;
+    Pid -> 
+      Pid ! shutdown,
+      ok
+  end.
 
 connect(Host) ->
-  {server, node()} ! {add_host, Host},
-  ok.
+  case whereis(server) of
+    undefined -> 
+      not_running;
+    Pid -> 
+      Pid ! {add_host, Host},
+      ok
+  end.
 
 start() ->
-  io:format("Starting~n"),
-  Server = spawn(fun() -> loop() end),
-  register(server, Server),
-  io:format("Started~n").
+  case whereis(server) of
+    undefined ->
+      Server = spawn(fun() -> loop() end),
+      register(server, Server);
+    Pid ->
+      {already_running, Pid}
+  end.
 
 reload() ->
-  io:format("Swapping code~n"),
-  % TODO: Fix this, it's not exiting the old 'loop()' (stack overflow?)
-  {server, node()} ! {swap_code, fun() -> loop() end},
-  ok.
+  case whereis(server) of
+    undefined -> 
+      not_running;
+    Pid -> 
+      Pid ! {swap_code, fun() -> loop() end},
+      ok
+  end.
 
 loop() ->
-  io:format("Waiting~n"),
   receive
     {swap_code, LoopFunc, Host} ->
-      io:format("Loading new code (requested by ~p)~n", [Host]),
+      io:format("Remote reload (from ~p)~n", [Host]),
       LoopFunc();
     {swap_code, LoopFunc} ->
-      io:format("Reloading other nodes~n"),
       [{server, N} ! {swap_code, LoopFunc, node()} || N <- nodes()],
-      io:format("Loading new code~n"),
       LoopFunc();
     {add_host, Host} ->
-      io:format("Connecting to: ~p~n", [Host]),
       Status = net_kernel:connect_node(Host),
       case Status of
-        true -> io:format("Connected to ~p~n", [Host]);
-        false -> io:format("Unable to connect to ~p~n", [Host]);
-        ignored -> io:format("Not started with name (ie. erl -sname 'foo')")
+        true -> ok;
+        false -> io:format("Connection failed (~p)~n", [Host]);
+        ignored -> io:format("Missing name (ie. erl -sname 'foo')")
       end,
       loop();
     {chat, Message} ->
@@ -53,7 +65,6 @@ loop() ->
       io:format("~p: ~p~n", [Node, Message]),
       loop();
     shutdown ->
-      io:format("Stopping~n"),
       ok;
     Message ->
       io:format("Unknown message: ~p~n", Message),
