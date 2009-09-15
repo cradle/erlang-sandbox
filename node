@@ -3,10 +3,10 @@
 main([String]) ->
   try
     net_kernel:start([temp_name, shortnames]),
-    node:start(),
-    node:connect(foo@bar),
-    node:send(String),
-    node:stop(),
+    Node = node:start(),
+    node:connect(server@tbook, Node),
+    node:send(String, Node),
+    node:stop(Node),
     io:format("done~n")
   catch
     _:_ ->

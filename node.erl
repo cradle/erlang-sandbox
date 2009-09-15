@@ -22,15 +22,26 @@ status(Server) ->
   end.
 
 start() ->
-  spawn(fun() -> loop() end).
+  spawn(fun() -> client() end).
 
 reload(Server) ->
   Server ! {swap_code, fun() -> loop() end},
   ok.
 
-loop() ->
+manager(Servers) ->
   receive
-    {swap_code, LoopFunc, Host} ->
+    {register, Pid} ->
+      manager([Pid|Servers]);
+    {broadcast, Message} ->
+      [Pid ! Message || Pid <- Servers],
+      mananger(Servers);
+    shutdown ->
+      ok
+  end.
+
+client() ->
+  receive
+    {swap_code, clientFunc, Host} ->
       io:format("Remote reload (from ~p)~n", [Host]),
       LoopFunc();
     {swap_code, LoopFunc} ->
@@ -43,17 +54,18 @@ loop() ->
         false -> io:format("Connection failed (~p)~n", [Host]);
         ignored -> io:format("Missing name (ie. erl -sname 'foo')")
       end,
-      loop();
+      client();
     {chat, Message} ->
       io:format("You: ~p~n", [Message]),
+      % this no longer works, because we've stopped using named processes
       [{server, N} ! {print, Message, node()} || N <- nodes()],
-      loop();
+      client();
     {print, Message, Node} ->
       io:format("~p: ~p~n", [Node, Message]),
-      loop();
+      client();
     shutdown ->
       ok;
     Message ->
       io:format("Unknown message: ~p~n", Message),
-      loop()
+      client()
   end.

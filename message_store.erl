@@ -4,7 +4,7 @@
 
 -define(SERVER, message_store).
 
-start() ->
+start(ServerNameNameNameServerNameName) ->
   global:trans({?SERVER, ?SERVER},
     fun() ->
       case global:whereis_name(?SERVER) of
